@@ -1,0 +1,3 @@
+- wait for nim not copy bug be fixed
+- draw inputs,outputs,rails
+- enable drag&drop to connect in/out

@@ -5,7 +5,7 @@ author        = "Locria Cyber"
 description   = "A graphical algorithm editor"
 license       = "nobs"
 srcDir        = "src"
-bin           = @["flower_bed"]
+bin           = @["main"]
 binDir        = ".build"
 
 # Dependencies
