@@ -37,6 +37,9 @@ proc dotted_circle*(pos: Vector2, inner, outer: float, color: Color) =
     drawRing(pos, inner, outer, i, i+15, 0, color)
     i += 30
 
+proc draw(node: Node) =
+  drawRectangleLinesEx(node.shapepos, 2, fade(Black, 0.8))
+
 proc update_n_draw*(s: var State, dt: cfloat) =
   # update
   let mousepos = getMousePosition()
@@ -64,7 +67,7 @@ proc update_n_draw*(s: var State, dt: cfloat) =
   # draw shapes
   dotted_circle(s.last_clicked, cursor_circle_size, cursor_circle_size+2.0, fade(BLUE, 0.5))
   for node in s.nodes:
-    drawRectangleLinesEx(node.shapepos, 2, fade(Black, 0.8))
+    draw(node)
   drawRectangleLinesEx(playground, 4, fade(BLUE, 0.8))
   
   # ui

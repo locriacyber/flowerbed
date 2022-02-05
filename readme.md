@@ -8,3 +8,10 @@ A: No, you still have to learn type theory and math.
 
 Q: pfp plz
 A: ![screenshot of flower bed](TODO)
+
+## building
+
+1. compile raylib static library with CMake
+2. symbolic link the CMake build directory to `raylib_build` (in this repo)
+3. `nimble run`
+
