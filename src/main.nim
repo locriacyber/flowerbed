@@ -1,5 +1,5 @@
-import nimraylib_now, options, sequtils, math
-import consts, geometry, core
+import nimraylib_now, options, sequtils, math, strformat
+import consts, geometry, core, graphics
 
 type
   Node = object
@@ -37,26 +37,30 @@ type
     dst: CordEnd # input of dst
 
 let algorithm_dummy = Algorithm(
-  name: "2 in 2 out",
+  metadata: withName("2 in 2 out"),
   inputs: @[
-    ValueType(),
-    ValueType(),
+    (ValueType_Integer, withName("a")),
+    (ValueType_Integer, withName("b")),
   ],
   outputs: @[
-    ValueType(),
-    ValueType(),
+    (ValueType_Integer, withName("c")),
+    (ValueType_Integer, withName("d")),
   ],
 )
 
 let algorithm_1out = Algorithm(
-  name: "1 out",
+  metadata: withName("1 out"),
   inputs: @[],
-  outputs: @[ValueType()],
+  outputs: @[
+    (ValueType_Integer, withName("output"))
+  ],
 )
 
 let algorithm_1in = Algorithm(
-  name: "1 in",
-  inputs: @[ValueType()],
+  metadata: withName("1 in"),
+  inputs: @[
+    (ValueType_Integer, withName("input"))
+  ],
   outputs: @[],
 )
 
@@ -128,7 +132,9 @@ proc main() =
     cords.add(cord)
     cord
 
+  var font: Font
   proc init() =
+    font = getFontDefault()
     let trunk = addNode(Vector2(x: screenWidth/2.0, y: screenHeight/2.0), 32)
     let frag_center = addFragment(algorithm_dummy, trunk)
     let input = addNode(Vector2(x: screenWidth/2.0 - 200, y: screenHeight/2.0), 20)
@@ -156,8 +162,8 @@ proc main() =
         dnd.dragging.get.drop(mousepos)
         dnd.dragging = none(DragHandle)
 
-  proc seperate_ports(dt: float) =
-    # seperate ports
+  proc separate_ports(dt: float) =
+    # separate ports
     for f in fragments:
       let
         input_len = f.inputs.len
@@ -175,7 +181,7 @@ proc main() =
         for j in 0..<angles.len:
           if i == j: continue
           if distance(angles[i], angles[j]) < PORT_MINIMUM_DISTANCE:
-            seperate(angles[i], angles[j], f.node.radius * dt * PORT_SEPERATION_SPEED)
+            separate(angles[i], angles[j], f.node.radius * dt * PORT_SEPERATION_SPEED)
       # map back to radians
       for i in 0..<input_len:
         let cord =  f.inputs[i].cord
@@ -192,16 +198,14 @@ proc main() =
 
   proc update(dt: float) =
     drag_and_drop()
-    seperate_ports(dt)
+    separate_ports(dt)
 
-  let font: Font = getFontDefault()
-
-  proc getPortPos(node: Node, angle: Angle): Vector2 =
-    node.center + unitVector2WithAngle(angle) * node.radius
+  proc getPortPos(node: Node, angle: Angle, distance = node.radius): Vector2 =
+    node.center + unitVector2WithAngle(angle) * distance
 
   proc draw() =
     clearBackground RAYWHITE
-
+    
     # draw touch nodes
     for n in nodes:
       drawCircleThickLines(n.center, n.radius-1, n.radius+1, fade(Black, 0.3))
@@ -228,18 +232,44 @@ proc main() =
       for port in f.outputs:
         drawPort(center=getPortPos(f.node[], port.angle), rotation=port.angle)
     
-    let font_size = 20.0
-
     # draw fragment info when hovered
     let mousepos = getMousePosition()
     for f in fragments:
       if checkCollisionPointCircle(mousepos, f.node.center, f.node.radius):
-        let name = f.algorithm.name.cstring
-        let text_size = measureTextEx(font, f.algorithm.name.cstring, font_size, 2)
-        drawTextEx(font, f.algorithm.name.cstring, f.node.center - text_size / 2, font_size, 2, Black)
+        var labels: seq[Label]
+
+        let f = f
+        proc labelPort(port: Port, text: string) =
+          let port_pos = getPortPos(f.node[], port.angle)
+          labels.add newLabel(font, font_size=10.0.float, text, port_pos)
+
+        # add lables
+        labels.add newLabel(font, font_size=20.0, text=f.algorithm.name, f.node.center)
+        for i in 0..<f.inputs.len:
+          let parameter = f.algorithm.inputs[i]
+          labelPort(port=f.inputs[i], text=
+            fmt"{parameter.metadata.name}: {parameter.type.metadata.name}")
+        for i in 0..<f.outputs.len:
+          let parameter = f.algorithm.outputs[i]
+          labelPort(port=f.outputs[i], text=
+            fmt"{parameter.metadata.name}: {parameter.type.metadata.name}")
+
+
+        var any_overlap = true
+        var fuel = 32
+        while any_overlap and fuel > 0:
+          fuel -= 1
+          any_overlap = false
+          for i in 0..<labels.len:
+            for j in i+1..<labels.len:
+              any_overlap = separate(labels[i].aabb, labels[j].aabb, 2 * PORT_SEPERATION_SPEED)
+        
+        for label in labels:
+          label.draw()
         
         break
 
+    drawFPS(10, 10)
   
   init()
   discard getFrameTime()
