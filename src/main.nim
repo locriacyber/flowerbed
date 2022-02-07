@@ -1,5 +1,5 @@
-import nimraylib_now, options, sequtils, geometry, core
-import ../consts
+import nimraylib_now, options, sequtils, math
+import consts, geometry, core
 
 type
   Node = object
@@ -61,7 +61,7 @@ let algorithm_1in = Algorithm(
 )
 
 const PORT_MINIMUM_DISTANCE = 0.5
-const PORT_SEPERATION_SPEED = 0.2
+const PORT_SEPERATION_SPEED = 0.5
 
 proc drawCircleThickLines(center: Vector2, innerRadius, outerRadius: float, color: Color) =
   drawRing(center, innerRadius, outerRadius, 0, 360, 0, color)
@@ -194,19 +194,17 @@ proc main() =
     drag_and_drop()
     seperate_ports(dt)
 
-  let font: Font = getFont()
+  let font: Font = getFontDefault()
 
   proc getPortPos(node: Node, angle: Angle): Vector2 =
     node.center + unitVector2WithAngle(angle) * node.radius
 
   proc draw() =
     clearBackground RAYWHITE
+
+    # draw touch nodes
     for n in nodes:
       drawCircleThickLines(n.center, n.radius-1, n.radius+1, fade(Black, 0.3))
-
-    for f in fragments:
-      # algorithm name labels
-      drawTextEx(font, f.algorithm.name.cstring, f.node.center, 20, 2, Black)
 
     # draw cords
     for c in cords:
@@ -225,12 +223,23 @@ proc main() =
 
     # draw ports
     for f in fragments:
-      for port_input in f.inputs:
-        let port_center = getPortPos(f.node[], port_input.angle)
-        drawCircleV(port_center, 11, Raywhite)
+      for port in f.inputs:
+        drawPort(center=getPortPos(f.node[], port.angle), rotation=port.angle + Pi)
+      for port in f.outputs:
+        drawPort(center=getPortPos(f.node[], port.angle), rotation=port.angle)
+    
+    let font_size = 20.0
+
+    # draw fragment info when hovered
+    let mousepos = getMousePosition()
+    for f in fragments:
+      if checkCollisionPointCircle(mousepos, f.node.center, f.node.radius):
+        let name = f.algorithm.name.cstring
+        let text_size = measureTextEx(font, f.algorithm.name.cstring, font_size, 2)
+        drawTextEx(font, f.algorithm.name.cstring, f.node.center - text_size / 2, font_size, 2, Black)
         
-        drawCircleThickLines(port_center, 10, 12, Blue)
-      
+        break
+
   
   init()
   discard getFrameTime()
