@@ -50,3 +50,7 @@ proc draw*(label: Label, fg: Color = Black, bg: Color = fade(Raywhite, 0.6), bor
   drawRectangleRec(bg_rect, bg)
   drawTextEx(label.font, label.text.cstring, label.aabb.topleft, label.font_size, label.font_spacing, fg)
   drawRectangleLinesEx(bg_rect, border_size, fg)
+
+
+proc drawCircleThickLines*(center: Vector2, innerRadius, outerRadius: float, color: Color) =
+  drawRing(center, innerRadius, outerRadius, 0, 360, 0, color)

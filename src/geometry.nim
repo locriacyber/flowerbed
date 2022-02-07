@@ -149,3 +149,9 @@ proc separate*(a: var Rectangle, b: Rectangle, seperation_distance: float): bool
     true
   else:
     false
+
+
+import skeuomorph
+
+proc getPortPos*(node: Node, angle: Angle, distance = node.radius): Vector2 =
+  node.center + unitVector2WithAngle(angle) * distance
