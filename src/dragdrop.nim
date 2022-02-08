@@ -1,4 +1,5 @@
-import options, nimraylib_now
+import std/[options, tables, sugar]
+import nimraylib_now
 
 type
   DragHandle* = object
@@ -9,13 +10,26 @@ type
     check_collision*: proc (cursor_pos: Vector2): bool
     start_drag*: proc (cursor_pos: Vector2): DragHandle
 
+  DragDropObjectHandle* = int64
+
   DragDropManager* = object
-    candidates*: seq[DragDropObject]
+    next_id: DragDropObjectHandle
+    candidates: OrderedTable[DragDropObjectHandle, (int, DragDropObject)]
     dragging*: Option[DragHandle]
+
+proc add*(dnd: var DragDropManager, o: DragDropObject, priority: int = 0): DragDropObjectHandle =
+  let id = dnd.next_id
+  dnd.next_id += 1
+  dnd.candidates[id] = (priority, o)
+  dnd.candidates.sort((a, b) => a[0] - b[0])
+  id
+
+proc remove*(dnd: var DragDropManager, id: DragDropObjectHandle) =
+  dnd.candidates.del(id)
 
 proc try_drag*(dnd: var DragDropManager, start_pos: Vector2) =
   for i in 0..<dnd.candidates.len:
-    let draggable_object = dnd.candidates[i]
+    let draggable_object = dnd.candidates[i][1]
     if draggable_object.check_collision(start_pos):
       dnd.dragging = some(draggable_object.start_drag(start_pos))
       break

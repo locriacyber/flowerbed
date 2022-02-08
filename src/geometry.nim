@@ -150,5 +150,47 @@ proc separate*(a: var Rectangle, b: Rectangle, multiple: float = 1.0): bool =
   else:
     false
 
-proc getPortPos*(node: Node, angle: Angle, distance = node.radius): Vector2 =
+proc getPortPos*(node: Node, angle: Angle): Vector2 =
+  let distance = node.radius
   node.center + unitVector2WithAngle(angle) * distance
+
+proc polygon*(port: Port, node: Node): seq[Vector2] =
+  let center = getPortPos(node, port.angle)
+  let rotation = 
+    case port.type
+    of Input: port.angle + Pi
+    of Output: port.angle  
+  PortPolygon.transform(8, rotation, center)
+
+import fenv
+  
+type
+  Edge = tuple[a, b: Vector2]
+func checkCollisionPointPolygon*(p: Vector2, poly: openArray[Vector2]): bool =
+  func raySegI(p: Vector2; edge: Edge): bool =
+    const Epsilon = 0.00001
+    if edge.a.y > edge.b.y:
+      # Swap "a" and "b".
+      return p.raySegI((edge.b, edge.a))
+    if p.y == edge.a.y or p.y == edge.b.y:
+      # p.y += Epsilon.
+      return vec2(p.x, p.y + Epsilon).raySegI(edge)
+    if p.y > edge.b.y or p.y < edge.a.y or p.x > max(edge.a.x, edge.b.x):
+      return false
+    if p.x < min(edge.a.x, edge.b.x):
+      return true
+    let blue = if abs(edge.a.x - p.x) > minimumPositiveValue(float):
+                (p.y - edge.a.y) / (p.x - edge.a.x)
+              else:
+                maximumPositiveValue(float)
+    let red = if abs(edge.a.x - edge.b.x) > minimumPositiveValue(float):
+                (edge.b.y - edge.a.y) / (edge.b.x - edge.a.x)
+              else:
+                maximumPositiveValue(float)
+    blue >= red
+  var in_shape = false
+  for i in 0..<poly.len:
+    if raySegI(p, (poly[i], poly[(i+1) mod poly.len])):
+      in_shape = not in_shape
+  in_shape
+  

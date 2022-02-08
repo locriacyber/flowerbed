@@ -1,5 +1,5 @@
 import nimraylib_now
-import core
+import core, dragdrop
 
 
 type
@@ -19,10 +19,17 @@ type
   Node* = object
     center*: Vector2
     radius*: float
+    dnd_id*: DragDropObjectHandle
+
+  PortType* {.pure.} = enum
+    Input
+    Output
 
   Port* = object
     cord*: Index[Cord]
     angle*: Angle
+    dnd_id*: DragDropObjectHandle
+    `type`*: PortType
   
   Fragment* = object
     algorithm*: Algorithm
@@ -37,6 +44,3 @@ type
   Cord* = object
     src*: CordEnd # output of src
     dst*: CordEnd # input of dst
-
-proc id*[T](x: Index[T]): Id =
-  x

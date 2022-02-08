@@ -1,12 +1,13 @@
+# import std/[math]
 import nimraylib_now
-import core, geometry
+import geometry, skeuomorph
 
-proc drawPort*(center: Vector2, rotation: Angle) =
-  let polygon = PortPolygon.transform(8, rotation, center)
+proc draw*(port: Port, node: Node) =
+  let polygon = port.polygon(node)
   # because polygon is convex, triangle fan is same as polygon
   drawTriangleFan(polygon[0].unsafeAddr, polygon.len, Raywhite)
   for i in 0..<polygon.len:
-    drawLineEx(polygon[i], polygon[(i+1).mod polygon.len], 1, Blue)
+    drawLineEx(polygon[i], polygon[(i+1) mod polygon.len], 1, Blue)
 
 type
   Alignment* = object

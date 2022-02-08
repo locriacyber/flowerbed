@@ -1,4 +1,5 @@
-- wait for nim not copy bug be fixed
-- draw inputs,outputs,rails
-- enable drag&drop to connect in/out
+- fix some ports cannot be dragged
+- enable drag & drop to connect in/out
+- save & load
+- rails
 - add affordance with mouse cursor shape

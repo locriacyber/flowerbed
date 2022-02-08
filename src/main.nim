@@ -38,11 +38,11 @@ proc main() =
   proc init(s: var MainState) =
     font = getFontDefault()
     let trunk = s.addNode(dnd, Vector2(x: screenWidth/2.0, y: screenHeight/2.0), 32)
-    let frag_center = s.addFragment(algorithm_dummy, trunk)
+    let frag_center = s.addFragment(dnd, algorithm_dummy, trunk)
     let input = s.addNode(dnd, Vector2(x: screenWidth/2.0 - 200, y: screenHeight/2.0), 20)
-    let frag_input = s.addFragment(algorithm_1out, input)
+    let frag_input = s.addFragment(dnd, algorithm_1out, input)
     let output = s.addNode(dnd, Vector2(x: screenWidth/2.0 + 200, y: screenHeight/2.0), 20)
-    let frag_output = s.addFragment(algorithm_1in, output)
+    let frag_output = s.addFragment(dnd, algorithm_1in, output)
     discard s.addCord(frag_input, frag_center, 0, 0)
     discard s.addCord(frag_center, frag_output, 0, 0)
 
@@ -71,7 +71,6 @@ proc main() =
     
   discard getFrameTime()
   
-  var frame_count = 0
   while not windowShouldClose():
     let dt = getFrameTime()
     handle_drag_and_drop()
@@ -83,8 +82,7 @@ proc main() =
       clearBackground Raywhite
       state.draw(font=font)
       drawFPS(10, 10)
-      drawText(fmt"Frame: {frame_count}".cstring, 10, 36, 20, Black)
-    frame_count += 1
+      drawText(fmt"Dragging: {dnd.dragging}".cstring, 10, 36, 20, Black)
 
   block:
     let f = open(save_filename, fmWrite)

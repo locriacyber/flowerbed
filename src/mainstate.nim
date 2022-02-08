@@ -1,4 +1,4 @@
-import std/[sequtils, math, strformat, random, tables]
+import std/[sequtils, strformat, random, tables, sugar]
 import nimraylib_now
 import core, skeuomorph, dragdrop, geometry, graphics
 
@@ -13,21 +13,24 @@ type
 const PORT_MINIMUM_DISTANCE = 0.5 # 1 is unit circle radius
 const PORT_SEPERATION_SPEED = 0.5
 
-proc get*(s: var MainState, id: Index[Fragment]): ptr Fragment =
+proc `[]`*(s: var MainState, id: Index[Fragment]): ptr Fragment =
   s.fragments[id].unsafeAddr
 
-proc get*(s: var MainState, id: Index[Node]): ptr Node =
+proc `[]`*(s: var MainState, id: Index[Node]): ptr Node =
   s.nodes[id].unsafeAddr
 
-proc get*(s: var MainState, id: Index[Cord]): ptr Cord =
+proc `[]`*(s: var MainState, id: Index[Cord]): ptr Cord =
   s.cords[id].unsafeAddr
 
-template lookup*(x: typed, s: var MainState): untyped =
-  s.get(x)
+template `[]`*[T](s: ptr MainState, id: Index[T]): ptr T =
+  s[][id]
 
-proc registerNodeDragDrop*(s: var MainState, dnd: var DragDropManager, id: Id) =
+template lookup*(x: typed, s: var MainState): untyped =
+  s[x]
+
+proc registerNodeDragDrop*(s: var MainState, dnd: var DragDropManager, id: Id): DragDropObjectHandle =
   let s = s.unsafeAddr
-  dnd.candidates.add(DragDropObject(
+  dnd.add(DragDropObject(
     check_collision: proc (cursor_pos: Vector2): bool =
       let node = s.nodes[id].unsafeAddr
       checkCollisionPointCircle(cursor_pos, node.center, node.radius)
@@ -43,26 +46,58 @@ proc registerNodeDragDrop*(s: var MainState, dnd: var DragDropManager, id: Id) =
   ))
 
 proc addNode*(s: var MainState, dnd: var DragDropManager, pos: Vector2, radius: float): Index[Node] =
-  let node = Node(
+  var node = Node(
     center: pos,
     radius: radius,
   )
   let id = s.id_issuer.next()
+  node.dnd_id = s.registerNodeDragDrop(dnd, id)
   s.nodes[id] = node
-  s.registerNodeDragDrop(dnd, id)
   id
 
-proc addFragment*(s: var MainState, a: Algorithm, node_id: Index[Node]): Index[Fragment] =
-  let frag = Fragment(
+proc removeNode*(s: var MainState, dnd: var DragDropManager, i: Index[Node]) =
+  dnd.remove(i.lookup(s).dnd_id)
+  s.nodes.del(i)
+
+proc registerPortDragDrop*(s: var MainState, dnd: var DragDropManager, id: Index[Fragment], get_port: proc (_: Fragment): Port): DragDropObjectHandle =
+  let s = s.unsafeAddr
+  dnd.add(DragDropObject(
+    check_collision: proc (cursor_pos: Vector2): bool =
+      let frag = s[id][]
+      let node: Node = s[frag.node][]
+      let port = frag.get_port
+      let polygon: seq[Vector2] = port.polygon(node)
+      checkCollisionPointPolygon(cursor_pos, polygon)
+    ,
+    start_drag: proc (_: Vector2): DragHandle =
+      DragHandle(
+        drag: proc (cursor_moved: Vector2): void =
+          discard
+          # let node = s.nodes[id].unsafeAddr
+          # node.center += cursor_moved
+        ,
+        drop: proc (_: Vector2): void = discard
+      )
+  ), priority=10)
+
+proc addFragment*(s: var MainState, dnd: var DragDropManager, a: Algorithm, node_id: Index[Node]): Index[Fragment] =
+  var frag = Fragment(
     algorithm: a,
     node: node_id,
-    inputs: repeat(Port(cord: -1, angle: 0.0), a.inputs.len),
-    outputs: repeat(Port(cord: -1, angle: 0.0), a.outputs.len),
+    inputs: repeat(Port(cord: -1, angle: 0.0, type: Input), a.inputs.len),
+    outputs: repeat(Port(cord: -1, angle: 0.0, type: Output), a.outputs.len),
   )
   let id = s.id_issuer.next()
+  for i in 0..<frag.inputs.len:
+    frag.inputs[i].dnd_id = registerPortDragDrop(s, dnd, id, (f) => f.inputs[i])
+  for i in 0..<frag.outputs.len:
+    frag.outputs[i].dnd_id = registerPortDragDrop(s, dnd, id, (f) => f.outputs[i])
   s.fragments[id] = frag
   id
-  
+
+proc removeFragment*(s: var MainState, i: Index[Fragment]) =
+  discard ## TODO
+
 proc addCord*(s: var MainState; src, dst: Index[Fragment]; src_i, dst_i: uint): Index[Cord]=
   let
     f_src = src.lookup(s)
@@ -144,11 +179,12 @@ proc draw*(s: var MainState, font: Font) =
 
   # draw ports
   for f in s.fragments.values:
+    let node = f.node.lookup(s)[]
     for port in f.inputs:
-      drawPort(center=getPortPos(f.node.lookup(s)[], port.angle), rotation=port.angle + Pi)
+      port.draw(node)
     for port in f.outputs:
-      drawPort(center=getPortPos(f.node.lookup(s)[], port.angle), rotation=port.angle)
-  
+      port.draw(node)
+      
   # draw fragment info when hovered
   let mousepos = getMousePosition()
   for f in s.fragments.values:
