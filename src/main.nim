@@ -1,3 +1,4 @@
+import std/[strformat]
 import nimraylib_now
 import consts, core, dragdrop, mainstate
 
@@ -42,8 +43,8 @@ proc main() =
     let frag_input = s.addFragment(algorithm_1out, input)
     let output = s.addNode(dnd, Vector2(x: screenWidth/2.0 + 200, y: screenHeight/2.0), 20)
     let frag_output = s.addFragment(algorithm_1in, output)
-    discard s.addCord((frag_input, 0.uint), (frag_center, 0.uint))
-    discard s.addCord((frag_center, 0.uint), (frag_output, 0.uint))
+    discard s.addCord(frag_input, frag_center, 0, 0)
+    discard s.addCord(frag_center, frag_output, 0, 0)
 
   proc handle_drag_and_drop() =
     let mousepos = getMousePosition()
@@ -70,6 +71,7 @@ proc main() =
     
   discard getFrameTime()
   
+  var frame_count = 0
   while not windowShouldClose():
     let dt = getFrameTime()
     handle_drag_and_drop()
@@ -81,6 +83,8 @@ proc main() =
       clearBackground Raywhite
       state.draw(font=font)
       drawFPS(10, 10)
+      drawText(fmt"Frame: {frame_count}".cstring, 10, 36, 20, Black)
+    frame_count += 1
 
   block:
     let f = open(save_filename, fmWrite)

@@ -1,4 +1,6 @@
 type
+  Angle* = float
+
   ValueType* = object # TODO
     metadata*: Metadata
   

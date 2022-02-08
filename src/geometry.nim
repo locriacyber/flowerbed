@@ -1,7 +1,7 @@
-import nimraylib_now, math, algorithm, sequtils, sugar
+import std/[math, algorithm, sequtils, sugar]
+import nimraylib_now
+import core, skeuomorph
 
-type 
-  Angle* = float
 
 const PORT_POLYGON*: seq[Vector2] = block:
   const lowerhalf = @[
@@ -17,7 +17,7 @@ const PORT_POLYGON*: seq[Vector2] = block:
     ))
   )
 
-proc newVec2*(x, y: float): Vector2 =
+proc vec2*(x, y: float): Vector2 =
   Vector2(
     x: x,
     y: y,
@@ -127,7 +127,7 @@ proc easiestSeperationDirection(a: Rectangle, b: Rectangle): Option[Vector2] =
     sx = -sx
   if dy < 0:
     sy = -sy
-  return some(newVec2(sx, sy))
+  return some(vec2(sx, sy))
 
 
 proc solveCollision(a: var Rectangle, b: Rectangle, easiestDirection: Vector2) =
@@ -142,16 +142,13 @@ proc solveCollision(a: var Rectangle, b: Rectangle, easiestDirection: Vector2) =
   
 
 
-proc separate*(a: var Rectangle, b: Rectangle, seperation_distance: float): bool =
+proc separate*(a: var Rectangle, b: Rectangle, multiple: float = 1.0): bool =
   let v = easiestSeperationDirection(a, b)
   if v.isSome:
-    solveCollision(a, b, v.get)
+    solveCollision(a, b, v.get * multiple)
     true
   else:
     false
-
-
-import skeuomorph
 
 proc getPortPos*(node: Node, angle: Angle, distance = node.radius): Vector2 =
   node.center + unitVector2WithAngle(angle) * distance

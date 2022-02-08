@@ -1,5 +1,5 @@
 import nimraylib_now
-import geometry
+import core, geometry
 
 proc drawPort*(center: Vector2, rotation: Angle) =
   let polygon = PortPolygon.transform(8, rotation, center)
@@ -34,7 +34,7 @@ type Label* = object
 proc newLabel*(font: Font, font_size: float, text: string, pos: Vector2, spacing: float = font_size * 0.1, padding: float = 4.0, alignment: Alignment = Alignment_Center): Label =
   if text.len == 0: return
   let text_size = measureTextEx(font, text, font_size, spacing)
-  let topleft = pos - (text_size / 2) + text_size.dotProduct(alignment.shift)
+  let topleft = pos - (text_size / 2) + text_size * alignment.shift
   let rect = Rectangle(topleft, text_size)
   Label(
     aabb: rect,
