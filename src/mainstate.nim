@@ -1,48 +1,90 @@
-import std/[sequtils, strformat, random, tables, sugar]
+import std/[sequtils, strformat, random, tables, sets]
 import nimraylib_now
 import core, skeuomorph, dragdrop, geometry, graphics
 
 
 type
+  DraggedKind* {.pure.} = enum
+    Fragment
+    Port
+
+  Dragged* = object
+    case kind: DraggedKind
+    of DraggedKind.Fragment: frag_id: Index[Fragment]
+    of DraggedKind.Port: port_id: PortId
+
   MainState* = object
     id_issuer: IdIssuer
     nodes: Table[Id, Node]
     fragments: Table[Id, Fragment]
     cords: Table[Id, Cord]
+    dragging*: HashSet[Dragged]
+
+template `==`*(a, b: Dragged): bool =
+  a.kind == b.kind and (
+    case a.kind
+    of DraggedKind.Fragment: a.frag_id == b.frag_id
+    of DraggedKind.Port: a.port_id == b.port_id
+  )
 
 const PORT_MINIMUM_DISTANCE = 0.5 # 1 is unit circle radius
 const PORT_SEPERATION_SPEED = 0.5
 
-proc `[]`*(s: var MainState, id: Index[Fragment]): ptr Fragment =
-  s.fragments[id].unsafeAddr
+template `[]`*(s: MainState, id: Index[Fragment]): untyped =
+  s.fragments[id]
 
-proc `[]`*(s: var MainState, id: Index[Node]): ptr Node =
-  s.nodes[id].unsafeAddr
+template `[]`*(s: MainState, id: Index[Node]): untyped =
+  s.nodes[id]
 
-proc `[]`*(s: var MainState, id: Index[Cord]): ptr Cord =
-  s.cords[id].unsafeAddr
+template `[]`*(s: MainState, id: Index[Cord]): untyped =
+  s.cords[id]
 
-template `[]`*[T](s: ptr MainState, id: Index[T]): ptr T =
+template `[]`*(s: MainState, port_id: PortId): Port =
+  case port_id.type:
+  of Input: s[port_id.fragment].inputs[port_id.ordinal]
+  of Output: s[port_id.fragment].outputs[port_id.ordinal]
+
+template `[]`*[T](s: ptr MainState, id: Index[T]): untyped =
+  s[][id]
+
+template `[]`*(s: ptr MainState, id: PortId): untyped =
   s[][id]
 
 template lookup*(x: typed, s: var MainState): untyped =
   s[x]
 
+proc port_pos*(s: MainState, port_id: PortId): Vector2 =
+  let frag = s[port_id.fragment]
+  let node = s[frag.node]
+  let port = s[port_id]
+  getPortPos(node, port.angle)
+
 proc registerNodeDragDrop*(s: var MainState, dnd: var DragDropManager, id: Id): DragDropObjectHandle =
   let s = s.unsafeAddr
+  let drag_id = Dragged(
+    kind: DraggedKind.Fragment,
+    frag_id: id,
+  )
   dnd.add(DragDropObject(
     check_collision: proc (cursor_pos: Vector2): bool =
       let node = s.nodes[id].unsafeAddr
       checkCollisionPointCircle(cursor_pos, node.center, node.radius)
     ,
     start_drag: proc (_: Vector2): DragHandle =
+      s.dragging.incl(drag_id)
       DragHandle(
         drag: proc (cursor_moved: Vector2): void =
           let node = s.nodes[id].unsafeAddr
           node.center += cursor_moved
         ,
-        drop: proc (_: Vector2): void = discard
+        drop: proc (_: Vector2): void =
+          s.dragging.excl(drag_id)
       )
+    ,
+    debug_draw: proc () =
+      let
+        node = s.nodes[id].unsafeAddr
+      drawCross(node.center, Yellow)
   ))
 
 proc addNode*(s: var MainState, dnd: var DragDropManager, pos: Vector2, radius: float): Index[Node] =
@@ -59,26 +101,49 @@ proc removeNode*(s: var MainState, dnd: var DragDropManager, i: Index[Node]) =
   dnd.remove(i.lookup(s).dnd_id)
   s.nodes.del(i)
 
-proc registerPortDragDrop*(s: var MainState, dnd: var DragDropManager, id: Index[Fragment], get_port: proc (_: Fragment): Port): DragDropObjectHandle =
+proc check_collision_port*(s: MainState, cursor_pos: Vector2, port_id: PortId): bool =
+  let
+    port = s[port_id]
+    frag = s[port_id.fragment]
+    node: Node = s[frag.node]
+    polygon: seq[Vector2] = port.polygon(node)
+  checkCollisionPointPolygon(cursor_pos, polygon)
+
+proc registerPortDragDrop*(s: var MainState, dnd: var DragDropManager, port_id: PortId): DragDropObjectHandle =
   let s = s.unsafeAddr
-  dnd.add(DragDropObject(
-    check_collision: proc (cursor_pos: Vector2): bool =
-      let frag = s[id][]
-      let node: Node = s[frag.node][]
-      let port = frag.get_port
-      let polygon: seq[Vector2] = port.polygon(node)
-      checkCollisionPointPolygon(cursor_pos, polygon)
-    ,
-    start_drag: proc (_: Vector2): DragHandle =
-      DragHandle(
-        drag: proc (cursor_moved: Vector2): void =
-          discard
-          # let node = s.nodes[id].unsafeAddr
-          # node.center += cursor_moved
-        ,
-        drop: proc (_: Vector2): void = discard
-      )
-  ), priority=10)
+  let drag_id = Dragged(
+    kind: DraggedKind.Port,
+    port_id: port_id,
+  )
+  let o =
+    DragDropObject(
+      check_collision: proc (cursor_pos: Vector2): bool = check_collision_port(s[], cursor_pos, port_id),
+      start_drag: proc (_: Vector2): DragHandle =
+        # let
+          # frag = s[id][]
+          # node: Node = s[frag.node][]
+          # port = s[port_id][]
+          # frag = s[port_id.frag][]
+        s.dragging.incl(drag_id)
+        DragHandle(
+          drag: proc (cursor_moved: Vector2): void =
+            discard
+            # let node = s.nodes[id].unsafeAddr
+            # node.center += cursor_moved
+          ,
+          drop: proc (_: Vector2): void =
+            s.dragging.excl(drag_id)
+        )
+      ,
+      debug_draw: proc () =
+        let
+          port = s[port_id]
+          frag = s[port_id.fragment]
+          node: Node = s[frag.node]
+        let pos = getPortPos(node, port.angle)
+        drawCross(pos, Red)
+    )
+  dnd.add(o, priority=10)
 
 proc addFragment*(s: var MainState, dnd: var DragDropManager, a: Algorithm, node_id: Index[Node]): Index[Fragment] =
   var frag = Fragment(
@@ -89,31 +154,42 @@ proc addFragment*(s: var MainState, dnd: var DragDropManager, a: Algorithm, node
   )
   let id = s.id_issuer.next()
   for i in 0..<frag.inputs.len:
-    frag.inputs[i].dnd_id = registerPortDragDrop(s, dnd, id, (f) => f.inputs[i])
+    let port_id = PortId(
+      fragment: id,
+      type: Input,
+      ordinal: i.uint,
+    )
+    frag.inputs[i].dnd_id = registerPortDragDrop(s, dnd, port_id)
   for i in 0..<frag.outputs.len:
-    frag.outputs[i].dnd_id = registerPortDragDrop(s, dnd, id, (f) => f.outputs[i])
+    let port_id = PortId(
+      fragment: id,
+      type: Output,
+      ordinal: i.uint,
+    )
+    frag.outputs[i].dnd_id = registerPortDragDrop(s, dnd, port_id)
   s.fragments[id] = frag
   id
 
 proc removeFragment*(s: var MainState, i: Index[Fragment]) =
   discard ## TODO
 
-proc addCord*(s: var MainState; src, dst: Index[Fragment]; src_i, dst_i: uint): Index[Cord]=
-  let
-    f_src = src.lookup(s)
-    f_dst = dst.lookup(s)
+proc addCord*(s: var MainState; src, dst: Index[Fragment]; src_i, dst_i: uint): Index[Cord] =
+  template f_src: untyped = s[src]
+  template f_dst: untyped = s[dst]
 
   assert src_i < f_src.outputs.len.uint
   assert dst_i < f_dst.inputs.len.uint
   let id = s.id_issuer.next()
   let cord = Cord(
-    src: CordEnd(
+    src: PortId(
       fragment: src,
-      port_id: src_i,
+      ordinal: src_i,
+      type: Output,
     ),
-    dst: CordEnd(
+    dst: PortId(
       fragment: dst,
-      port_id: dst_i,
+      ordinal: dst_i,
+      type: Input,
     ),
   )
   f_src.outputs[src_i].cord = id
@@ -125,7 +201,7 @@ proc addCord*(s: var MainState; src, dst: Index[Fragment]; src_i, dst_i: uint): 
 proc separate_ports*(s: var MainState, dt: float) =
   # separate ports
   for fi in s.fragments.keys:
-    let f = s.fragments[fi].unsafeAddr
+    var f = s.fragments[fi].unsafeAddr
     let
       input_len = f.inputs.len
       output_len = f.outputs.len
@@ -142,8 +218,9 @@ proc separate_ports*(s: var MainState, dt: float) =
       for j in 0..<angles.len:
         if i == j: continue
         if distance(angles[i], angles[j]) < PORT_MINIMUM_DISTANCE:
-          separate(angles[i], angles[j], f.node.lookup(s).radius * dt * PORT_SEPERATION_SPEED)
+          separate(angles[i], angles[j], s[f.node].radius * dt * PORT_SEPERATION_SPEED)
     # map back to radians
+    # for connected ports, point to connected fragment
     for i in 0..<input_len:
       try:
         let cord = f.inputs[i].cord.lookup(s)
@@ -154,7 +231,7 @@ proc separate_ports*(s: var MainState, dt: float) =
       try:
         let cord =  f.outputs[j].cord.lookup(s)
         f.outputs[j].angle = angle(cord.dst.fragment.lookup(s).node.lookup(s).center - cord.src.fragment.lookup(s).node.lookup(s).center)
-      except KeyError:
+      except KeyError as e:
         f.outputs[j].angle = angle(angles[input_len + j])
 
 proc draw*(s: var MainState, font: Font) =  
@@ -163,23 +240,17 @@ proc draw*(s: var MainState, font: Font) =
     drawCircleThickLines(n.center, n.radius-1, n.radius+1, fade(Black, 0.3))
 
   # draw cords
-  for c in s.cords.values:
-    let
-      s_frag = c.src.fragment.lookup(s)
-      s_i = c.src.port_id
-      d_frag = c.dst.fragment.lookup(s)
-      d_i = c.dst.port_id
-    
+  for c in s.cords.values:    
     drawLineEx(
-      getPortPos(s_frag.node.lookup(s)[], s_frag.outputs[s_i].angle),
-      getPortPos(d_frag.node.lookup(s)[], d_frag.inputs[d_i].angle),
+      portpos(s, c.src),
+      portpos(s, c.dst),
       8,
       Blue,
     )
 
   # draw ports
   for f in s.fragments.values:
-    let node = f.node.lookup(s)[]
+    let node = f.node.lookup(s)
     for port in f.inputs:
       port.draw(node)
     for port in f.outputs:
@@ -198,7 +269,7 @@ proc draw*(s: var MainState, font: Font) =
       var labels: seq[Label]
 
       proc label_port(port: Port, text: string) =
-        let port_pos = getPortPos(node[], port.angle)
+        let port_pos = getPortPos(node, port.angle)
         labels.add newLabel(font, font_size=10.0.float, text, port_pos)
 
       # add lables

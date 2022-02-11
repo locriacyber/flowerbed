@@ -55,3 +55,12 @@ proc draw*(label: Label, fg: Color = Black, bg: Color = fade(Raywhite, 0.6), bor
 
 proc drawCircleThickLines*(center: Vector2, innerRadius, outerRadius: float, color: Color) =
   drawRing(center, innerRadius, outerRadius, 0, 360, 0, color)
+
+proc drawCross*(center: Vector2, color: Color) =
+  let
+    l_start = center + vec2(0, -10)
+    l_end = center + vec2(0, 10)
+    h_start = center + vec2(-10, 0)
+    h_end = center + vec2(10, 0)
+  drawLineV(l_start, l_end, Yellow)
+  drawLineV(h_start, h_end, Yellow)

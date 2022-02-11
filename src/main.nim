@@ -1,16 +1,18 @@
-import std/[strformat]
+import std/[strformat, sets]
 import nimraylib_now
-import consts, core, dragdrop, mainstate
+import consts, core, dragdrop, mainstate, skeuomorph
 
 let algorithm_dummy = Algorithm(
   metadata: withName("2 in 2 out"),
   inputs: @[
     (ValueType_Integer, withName("a")),
     (ValueType_Integer, withName("b")),
+    (ValueType_Integer, withName("e")),
   ],
   outputs: @[
     (ValueType_Integer, withName("c")),
     (ValueType_Integer, withName("d")),
+    (ValueType_Integer, withName("f")),
   ],
 )
 
@@ -29,6 +31,8 @@ let algorithm_1in = Algorithm(
   ],
   outputs: @[],
 )
+
+import options
 
 proc main() =
   var dnd: DragDropManager
@@ -81,8 +85,13 @@ proc main() =
       defer: endDrawing()
       clearBackground Raywhite
       state.draw(font=font)
+      dnd.draw()
       drawFPS(10, 10)
-      drawText(fmt"Dragging: {dnd.dragging}".cstring, 10, 36, 20, Black)
+      var text_dragging = "Dragging:"
+      for dragged in state.dragging.items:
+        text_dragging.add "\n"
+        text_dragging.add fmt"  {dragged}"
+      drawText(text_dragging.cstring, 10, 36, 10, Black)
 
   block:
     let f = open(save_filename, fmWrite)

@@ -31,16 +31,17 @@ type
     dnd_id*: DragDropObjectHandle
     `type`*: PortType
   
+  PortId* {.requires_init.} = object
+    fragment*: Index[Fragment]
+    `type`*: PortType
+    ordinal*: uint # 0 means first input/output on fragment
+ 
   Fragment* = object
     algorithm*: Algorithm
     node*: Index[Node]
     inputs*: seq[Port]
     outputs*: seq[Port]
-
-  CordEnd* = object
-    fragment*: Index[Fragment]
-    port_id*: uint
   
   Cord* = object
-    src*: CordEnd # output of src
-    dst*: CordEnd # input of dst
+    src*: PortId # output of src
+    dst*: PortId # input of dst
