@@ -12,3 +12,4 @@ binDir        = ".build"
 
 requires "nim >= 1.6.2"
 requires "nimraylib_now >= 0.14.2"
+requires "ecs >= 1.0"
